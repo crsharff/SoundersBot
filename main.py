@@ -13,6 +13,9 @@ import traceback
 import configparser
 
 ### Config ###
+import mls
+from teams import Teams
+
 LOG_FOLDER_NAME = "logs"
 SUBREDDIT = "SoundersFC"
 SUBREDDIT_TEAMS = "mls"
@@ -398,31 +401,28 @@ while True:
         skip = True
 
     try:
-        teamGames = []
-        nextGameIndex = -1
-        lastRecentIndex = 0
-        log.debug("Schedule Length: {}".format(len(schedule)))
-        for game in schedule:
-            if game['home'] == TEAM_NAME or game['away'] == TEAM_NAME:
-                teamGames.append(game)
-                if game['datetime'] + datetime.timedelta(hours=2) > datetime.datetime.now() and nextGameIndex == -1:
-                    log.debug("Setting nextGameIndex to {}".format(len(teamGames) - 1))
-                    nextGameIndex = len(teamGames) - 1
+        # teamGames = []
+        # nextGameIndex = -1
+        # lastRecentIndex = 0
+        # log.debug("Schedule Length: {}".format(len(schedule)))
+        # for game in schedule:
+        #     if game['home'] == TEAM_NAME or game['away'] == TEAM_NAME:
+        #         teamGames.append(game)
+        #         if game['datetime'] + datetime.timedelta(hours=2) > datetime.datetime.now() and nextGameIndex == -1:
+        #             log.debug("Setting nextGameIndex to {}".format(len(teamGames) - 1))
+        #             nextGameIndex = len(teamGames) - 1
+        lastTenMatches = mls.getPreviousMatches(Teams.SEATTLE_SOUNDERS_FC.name, 10)
 
         strListGames.append("##Recent Match Results\n\n")
         strListGames.append("Date|||Opponent|Result\n")
         strListGames.append(":---:|:---:|---|:---|:---:|:---:\n")
 
-        lastRecentIndex = 0 if (nextGameIndex - 9 < 0) else nextGameIndex - 9
-
-        log.debug(nextGameIndex)
-
-        for game in teamGames[lastRecentIndex:nextGameIndex]:
-            strListGames.append(game['datetime'].strftime("%m/%d"))
+        for match in lastTenMatches:
+            strListGames.append(match.details.date.strftime("%m/%d"))
             strListGames.append("|[](")
             strListGames.append(getCompLink(game['comp']))
             strListGames.append(")|")
-            if game['home'] == TEAM_NAME:
+            if match.home_team == Teams.SEATTLE_SOUNDERS_FC.name:
                 strListGames.append("H")
                 strListGames.append("|")
                 strListGames.append(game['away'])
@@ -431,7 +431,7 @@ while True:
                 strListGames.append("|")
                 strListGames.append(game['home'])
             strListGames.append("|[")
-            strListGames.append(game['scoreString'])
+            strListGames.append(match.details.result)
             strListGames.append("]")
             strListGames.append("\n")
 
