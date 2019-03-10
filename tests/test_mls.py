@@ -1,6 +1,9 @@
 import mls
+from teams import Teams
+
 NUMBER_OF_EASTERN_CONFERENCE_TEAMS = 12
 NUMBER_OF_WESTERN_CONFERENCE_TEAMS = 12
+MLS_GAMES_PER_SEASON = 34
 
 def test_number_of_eastern_conference_teams():
     teams = mls.getNumberOfTeamsInEasternConference()
@@ -37,4 +40,13 @@ def test_get_teams():
     assert len(teams) == (NUMBER_OF_EASTERN_CONFERENCE_TEAMS + NUMBER_OF_WESTERN_CONFERENCE_TEAMS)
 
 def test_get_team():
-    team = mls.getTeam()
+    team = mls.getTeam(Teams.SEATTLE_SOUNDERS_FC)
+    assert team is not None
+    assert isinstance(team, mls.Team)
+    assert team.name == Teams.SEATTLE_SOUNDERS_FC.name
+
+def test_get_schedule():
+    schedule = mls.getSchedule(Teams.SEATTLE_SOUNDERS_FC)
+    assert schedule is not None
+    assert isinstance(schedule, mls.Schedule)
+    assert len(schedule) >= MLS_GAMES_PER_SEASON
