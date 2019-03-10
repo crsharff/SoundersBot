@@ -1,6 +1,4 @@
-from enum import Enum
-
-class Team(Enum):
+class Team:
     COLUMBUS_CREW_SC = "Columbus Crew SC"
     TORONTO_FC = "Toronto FC"
     DC_UNITED = "D.C. United"
@@ -13,3 +11,15 @@ class Team(Enum):
     PHILADELPHIA_UNION = "Philadelphia Union"
     ATLANTA_UNITED_FC = "Atlanta United FC"
     FC_CINCINNATI = "FC Cincinnati"
+    SEATTLE_SOUNDERS_FC = "Seattle Sounders FC"
+    MINNESOTA_UNITED_FC = "Minnesota United FC"
+    FC_DALLAS = "FC Dallas"
+    HOUSTON_DYNAMO = "Houston Dynamo"
+    REAL_SALT_LAKE = "Real Salt Lake"
+    LOS_ANGELES_FOOTBALL_CLUB = "Los Angeles Football Club"
+    LA_GALAXY = "LA Galaxy"
+    PORTLAND_TIMBERS = "Portland Timbers"
+    COLORADO_RAPIDS = "Colorado Rapids"
+    SPORTING_KANSAS_CITY = "Sporting Kansas City"
+    VANCOUVER_WHITECAPS_FC = "Vancouver Whitecaps FC"
+    SAN_JOSE_EARTHQUAKES = "San Jose Earthquakes"
