@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import requests
+import requests_cache
 
 MLS_STANDINGS_URL = "https://www.mlssoccer.com/standings"
 SOUNDERS_FC_SCHEDULE_URL = "https://www.soundersfc.com/schedule"
@@ -8,17 +9,16 @@ EASTERN_CONFERENCE = "Eastern"
 WESTERN_CONFERENCE = "Western"
 EASTERN_CONFERENCE_INDEX = 0
 WESTERN_CONFERENCE_INDEX = 1
+HOME = 'H'
+AWAY = 'A'
+
+requests_cache.install_cache('mls_cache', backend='memory')
 
 def getTeams():
     return getEasternConferenceTeams() + getWesternConferenceTeams()
 
 def getEasternConferenceTeams():
-    page = requests.get(MLS_STANDINGS_URL)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    conference_tables = soup.find_all(class_="standings_table")
-    if len(conference_tables) != NUMBER_OF_CONFERENCES:
-       return Exception
-
+    conference_tables = getConferenceTables()
     eastern_conference_table = conference_tables[EASTERN_CONFERENCE_INDEX]
     eastern_conference_teams = parseTable(EASTERN_CONFERENCE, eastern_conference_table)
     return eastern_conference_teams
@@ -28,12 +28,7 @@ def getEasternConferenceStandings():
     return sorted(eastern_conference_teams, key=lambda team: team.rank)
 
 def getWesternConferenceTeams():
-    page = requests.get(MLS_STANDINGS_URL)
-    soup = BeautifulSoup(page.content, 'html.parser')
-    conference_tables = soup.find_all(class_="standings_table")
-    if len(conference_tables) != NUMBER_OF_CONFERENCES:
-       return Exception
-
+    conference_tables = getConferenceTables()
     western_conference_table = conference_tables[WESTERN_CONFERENCE_INDEX]
     western_conference_teams = parseTable(WESTERN_CONFERENCE, western_conference_table)
     return western_conference_teams
@@ -49,7 +44,32 @@ def getNumberOfTeamsInWesternConference():
     return len(getWesternConferenceTeams())
 
 def getSchedule(team):
-    return
+    page = requests.get(SOUNDERS_FC_SCHEDULE_URL)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    matches = soup.find(class_="schedule_list").find_all(class_="row")
+    for match in matches:
+        home_away = match.select_one(".match_home_away").text
+        opponent = getTeam(match.select_one(".match_matchup"))
+        location = match.select_one(".match_location_short")
+        league = match.select_one(".match_competition")
+        date = match.select_one(".match_date")
+        result = match.select_one(".match_result")
+        details = MatchDetails(date, location, league, result)
+        match = Match(team if home_away == HOME else opponent, team if home_away == AWAY else opponent, details)
+    return match
+
+def getTeam(team):
+    for team in getTeams():
+        if team.name.lower() == team.lower():
+            return team
+
+def getConferenceTables():
+    page = requests.get(MLS_STANDINGS_URL)
+    soup = BeautifulSoup(page.content, 'html.parser')
+    conference_tables = soup.find_all(class_="standings_table")
+    if len(conference_tables) != NUMBER_OF_CONFERENCES:
+        return Exception
+    return conference_tables
 
 def parseTable(conference, conference_table):
     teams = []
@@ -65,7 +85,7 @@ def parseTable(conference, conference_table):
         losses = int(team.find("td", {"data-title": "Losses"}).getText())
         ties = int(team.find("td", {"data-title": "Ties"}).getText())
 
-        details = TeamDetails(points, games_played, goals_for, goals_difference, wins, losses, ties)
+        details = TeamStatistics(points, games_played, points_per_game, goals_for, goals_difference, wins, losses, ties)
         team = Team(club_name, conference, rank, details)
         teams.append(team)
     return teams
@@ -80,10 +100,11 @@ class Team:
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
 
-class TeamDetails:
-    def __init__(self, points, games_played, goals_for, goals_difference, wins, losses, ties):
+class TeamStatistics:
+    def __init__(self, points, games_played, points_per_game, goals_for, goals_difference, wins, losses, ties):
         self.points = points
         self.games_played = games_played
+        self.points_per_game = points_per_game
         self.goals_for = goals_for
         self.goals_difference = goals_difference
         self.wins = wins
@@ -92,3 +113,23 @@ class TeamDetails:
 
     def __str__(self):
         return str(self.__class__) + ": " + str(self.__dict__)
+
+class Schedule:
+    def __init__(self):
+        self.matches = []
+
+    def addMatch(self, match):
+        self.matches.append(match)
+
+class Match:
+    def __init__(self, home_team, away_team, details):
+        self.home_team = home_team
+        self.away_team = away_team
+        self.details = details
+
+class MatchDetails:
+    def __init__(self, date, location, league, result):
+        self.date = date
+        self.location = location
+        self.league = league
+        self.result = result
