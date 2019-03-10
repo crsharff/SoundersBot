@@ -1,9 +1,11 @@
 from bs4 import BeautifulSoup
 import requests
 import requests_cache
+import datetime
+
+from teams import Teams
 
 MLS_STANDINGS_URL = "https://www.mlssoccer.com/standings"
-SOUNDERS_FC_SCHEDULE_URL = "https://www.soundersfc.com/schedule"
 NUMBER_OF_CONFERENCES = 2
 EASTERN_CONFERENCE = "Eastern"
 WESTERN_CONFERENCE = "Western"
@@ -44,24 +46,42 @@ def getNumberOfTeamsInWesternConference():
     return len(getWesternConferenceTeams())
 
 def getSchedule(team):
-    page = requests.get(SOUNDERS_FC_SCHEDULE_URL)
+    page = requests.get(team.scheduleUrl)
     soup = BeautifulSoup(page.content, 'html.parser')
     matches = soup.find(class_="schedule_list").find_all(class_="row")
+    schedule = Schedule()
     for match in matches:
         home_away = match.select_one(".match_home_away").text
-        opponent = getTeam(match.select_one(".match_matchup"))
-        location = match.select_one(".match_location_short")
-        league = match.select_one(".match_competition")
-        date = match.select_one(".match_date")
-        result = match.select_one(".match_result")
+        opponent = getTeam(Teams.from_str(match.select_one(".match_matchup").text.replace('at ', '')))
+        location = match.select_one(".match_location_short").text
+        league = match.select_one(".match_competition").text
+        time = match.select_one(".match_time").text
+        date = datetime.datetime.strptime(match.select_one(".match_date").text.rstrip(), "%A, %B %d, %Y %I:%M%p PT")
+        if date <= datetime.datetime.now():
+            result = match.select_one(".match_result").text
         details = MatchDetails(date, location, league, result)
-        match = Match(team if home_away == HOME else opponent, team if home_away == AWAY else opponent, details)
-    return match
+        match = Match(team.name if home_away == HOME else opponent, team.name if home_away == AWAY else opponent, details)
+        schedule.addMatch(match)
+    return schedule
+
+def getPreviousMatches(team, number):
+    schedule = getSchedule(team)
+    for index, match in enumerate(schedule):
+        if match.details.date + datetime.timedelta(hours=2) > datetime.datetime.now():
+            break
+    return schedule[max(0, index - number): index]
+
+def getUpcomingMatches(team, number):
+    schedule = getSchedule(team)
+    for index, match in enumerate(schedule):
+        if match.details.date + datetime.timedelta(hours=2) > datetime.datetime.now():
+            break
+    return schedule[index:min(number, len(schedule))]
 
 def getTeam(team):
-    for team in getTeams():
-        if team.name.lower() == team.lower():
-            return team
+    for club in getTeams():
+        if club.name.lower() == team.name.lower():
+            return club
 
 def getConferenceTables():
     page = requests.get(MLS_STANDINGS_URL)
