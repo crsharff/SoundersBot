@@ -49,4 +49,4 @@ def test_get_schedule():
     schedule = mls.getSchedule(Teams.SEATTLE_SOUNDERS_FC)
     assert schedule is not None
     assert isinstance(schedule, mls.Schedule)
-    assert len(schedule) >= MLS_GAMES_PER_SEASON
+    assert len(schedule.matches) >= MLS_GAMES_PER_SEASON
