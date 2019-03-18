@@ -17,7 +17,12 @@ AWAY = 'A'
 requests_cache.install_cache('mls_cache', backend='memory')
 
 def getTeams():
-    return getEasternConferenceTeams() + getWesternConferenceTeams()
+    conference_tables = getConferenceTables()
+    eastern_conference_table = conference_tables[EASTERN_CONFERENCE_INDEX]
+    eastern_conference_teams = parseTable(EASTERN_CONFERENCE, eastern_conference_table)
+    western_conference_table = conference_tables[WESTERN_CONFERENCE_INDEX]
+    western_conference_teams = parseTable(WESTERN_CONFERENCE, western_conference_table)
+    return eastern_conference_teams + western_conference_teams
 
 def getEasternConferenceTeams():
     conference_tables = getConferenceTables()
@@ -64,20 +69,6 @@ def getSchedule(team):
         schedule.addMatch(match)
     return schedule
 
-def getPreviousMatches(team, number):
-    schedule = getSchedule(team)
-    for index, match in enumerate(schedule):
-        if match.details.date + datetime.timedelta(hours=2) > datetime.datetime.now():
-            break
-    return schedule[max(0, index - number): index]
-
-def getUpcomingMatches(team, number):
-    schedule = getSchedule(team)
-    for index, match in enumerate(schedule):
-        if match.details.date + datetime.timedelta(hours=2) > datetime.datetime.now():
-            break
-    return schedule[index:min(number, len(schedule))]
-
 def getTeam(team):
     for club in getTeams():
         if club.name.lower() == team.name.lower():
@@ -100,12 +91,12 @@ def parseTable(conference, conference_table):
         games_played = int(team.find("td", {"data-title": "Games Played"}).getText())
         points_per_game = float(team.find("td", {"data-title": "Points Per Game"}).getText())
         goals_for = int(team.find("td", {"data-title": "Goals For"}).getText())
-        goals_difference = int(team.find("td", {"data-title": "Goal Difference"}).getText())
+        goal_difference = int(team.find("td", {"data-title": "Goal Difference"}).getText())
         wins = int(team.find("td", {"data-title": "Wins"}).getText())
         losses = int(team.find("td", {"data-title": "Losses"}).getText())
         ties = int(team.find("td", {"data-title": "Ties"}).getText())
 
-        details = TeamStatistics(points, games_played, points_per_game, goals_for, goals_difference, wins, losses, ties)
+        details = TeamStatistics(points, games_played, points_per_game, goals_for, goal_difference, wins, losses, ties)
         team = Team(club_name, conference, rank, details)
         teams.append(team)
     return teams
@@ -121,12 +112,12 @@ class Team:
         return str(self.__class__) + ": " + str(self.__dict__)
 
 class TeamStatistics:
-    def __init__(self, points, games_played, points_per_game, goals_for, goals_difference, wins, losses, ties):
+    def __init__(self, points, games_played, points_per_game, goals_for, goal_difference, wins, losses, ties):
         self.points = points
         self.games_played = games_played
         self.points_per_game = points_per_game
         self.goals_for = goals_for
-        self.goals_difference = goals_difference
+        self.goal_difference = goal_difference
         self.wins = wins
         self.losses = losses
         self.ties = ties
@@ -140,6 +131,18 @@ class Schedule:
 
     def addMatch(self, match):
         self.matches.append(match)
+
+    def getPreviousMatches(self, number):
+        for index, match in enumerate(self.matches):
+            if match.details.date + datetime.timedelta(hours=2) > datetime.datetime.now():
+                break
+        return self.matches[max(0, index - number): index]
+
+    def getUpcomingMatches(self, number):
+        for index, match in enumerate(self.matches):
+            if match.details.date + datetime.timedelta(hours=2) > datetime.datetime.now():
+                break
+        return self.matches[index:min(number, len(self.matches))]
 
 class Match:
     def __init__(self, home_team, away_team, details):
