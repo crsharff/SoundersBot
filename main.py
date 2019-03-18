@@ -5,8 +5,6 @@ import re
 
 import praw
 import logging.handlers
-from lxml import html
-import requests
 import datetime
 import time
 import traceback
@@ -49,22 +47,6 @@ comps = [{'name': 'MLS', 'link': '/MLS', 'acronym': 'MLS'}
     , {'name': 'Open Cup', 'link': '/MLS', 'acronym': 'OPC'}
          ]
 
-
-def getCompLink(compName):
-    for comp in comps:
-        if comp['name'] in compName:
-            return comp['link']
-
-    return ""
-
-
-def matchesTable(table, str):
-    for item in table:
-        if str in item:
-            return True
-    return False
-
-
 teams = [{'link': '/r/dynamo', 'contains': 'Houston Dynamo'}
     , {'link': '/SEA', 'contains': 'Seattle Sounders FC'}
     , {'link': '/r/SportingKC', 'contains': 'Sporting Kansas City'}
@@ -76,205 +58,7 @@ teams = [{'link': '/r/dynamo', 'contains': 'Houston Dynamo'}
     , {'link': '/r/LAGalaxy', 'contains': 'LA Galaxy'}
     , {'link': '/r/Rapids', 'contains': 'Colorado Rapids'}
     , {'link': '/r/minnesotaunited', 'contains': 'Minnesota United'}
-    , {'link': '/r/LAFC', 'contains': 'Los Angeles Football Club'}
-         ]
-
-
-def getTeamLink(name):
-    for item in teams:
-        if item['contains'].lower() in name.lower():
-            return '[](' + item['link'] + ') ' + name
-
-    return ""
-
-
-### Parse table ###
-def compareTeams(team1, team2):
-    if int(team1['points']) > int(team2['points']):
-        return True
-    elif int(team1['points']) < int(team2['points']):
-        return False
-    else:
-        if int(team1['wins']) > int(team2['wins']):
-            return True
-        elif int(team1['wins']) < int(team2['wins']):
-            return False
-        else:
-            if int(team1['goalDiff']) > int(team2['goalDiff']):
-                return True
-            elif int(team1['goalDiff']) < int(team2['goalDiff']):
-                return False
-            else:
-                if int(team1['goalsFor']) > int(team2['goalsFor']):
-                    return True
-                elif int(team1['goalsFor']) < int(team2['goalsFor']):
-                    return False
-                else:
-                    log.error("Ran out of tiebreakers")
-                    return True
-
-#Returns sorted standings with team and details
-# [
-#     {
-#         "conf": "W",
-#         "goalDiff": "3",
-#         "goalsFor": "4",
-#         "losses": "0",
-#         "name": "Seattle Sounders FC",
-#         "played": "1",
-#         "points": "3",
-#         "ranking": "W1",
-#         "ties": "0",
-#         "wins": "1"
-#     },
-#     {
-#         "conf": "E",
-#         "goalDiff": "2",
-#         "goalsFor": "3",
-#         "losses": "0",
-#         "name": "Toronto FC",
-#         "played": "1",
-#         "points": "3",
-#         "ranking": "E1",
-#         "ties": "0",
-#         "wins": "1"
-#     },
-def parseTable():
-    page = requests.get("https://www.mlssoccer.com/standings")
-    tree = html.fromstring(page.content)
-
-    firstConf = {'name': "E", 'size': 12}
-    secondConf = {'name': "W", 'size': 12}
-    standings = []
-
-    for i in range(0, firstConf['size'] + secondConf['size']):
-        standings.append({'conf': (firstConf['name'] if i < firstConf['size'] else secondConf['name'])})
-
-    #Standings:
-    # {
-    #     "conf": "E"
-    # },
-    # {
-    #     "conf": "E"
-    # },
-    # {
-    #     "conf": "W"
-    # },
-    # {
-    #     "conf": "W"
-    # },
-    #log.debug(json.dumps(standings, indent=4, sort_keys=True, default=str))
-
-    # log.debug("Standings Size: {}".format(len(standings)))
-    elements = [{'title': 'Points', 'name': 'points'}
-        , {'title': 'Games Played', 'name': 'played'}
-        , {'title': 'Goals For', 'name': 'goalsFor'}
-        , {'title': 'Goal Difference', 'name': 'goalDiff'}
-        , {'title': 'Wins', 'name': 'wins'}
-        , {'title': 'Losses', 'name': 'losses'}
-        , {'title': 'Ties', 'name': 'ties'}
-                ]
-    #This accumulates raw statistics for each team
-    # 15: 02:39, 856 - DEBUG: Element: Wins
-    # 15: 02:39, 856 - DEBUG: [
-    #     [
-    #         0,
-    #         "1"
-    #     ],
-    #     [
-    #         1,
-    #         "1"
-    #     ],
-    #     [
-    #         2,
-    #         "1"
-    #     ],
-    for element in elements:
-        temp = list(enumerate(tree.xpath("//td[@data-title='" + element['title'] + "']/text()")))
-        #log.debug("Element: {}".format(element['title']))
-        #log.debug(json.dumps(temp, indent=4, sort_keys=True, default=str))
-        # log.debug("Temp Size: {}".format(len(temp)))
-        for i, item in enumerate(tree.xpath("//td[@data-title='" + element['title'] + "']/text()")):
-            # log.debug("i: {0}, Item: {1}".format(i, item))
-            standings[i][element['name']] = item
-
-    #This attaches names to the statistics manually after the fact
-    for i, item in enumerate(tree.xpath("//td[@data-title='Club']")):
-        names = item.xpath(".//a/span/text()")
-        if not len(names):
-            log.warning("Couldn't find team name")
-            continue
-        teamName = ""
-        for name in names:
-            if len(name) > len(teamName):
-                teamName = name
-
-        standings[i]['name'] = name
-
-    #Standings:
-    # [
-    #     {
-    #         "conf": "E",
-    #         "goalDiff": "2",
-    #         "goalsFor": "3",
-    #         "losses": "0",
-    #         "name": "Toronto FC",
-    #         "played": "1",
-    #         "points": "3",
-    #         "ties": "0",
-    #         "wins": "1"
-    #     },
-    #     {
-    #         "conf": "E",
-    #         "goalDiff": "2",
-    #         "goalsFor": "2",
-    #         "losses": "0",
-    #         "name": "D.C. United",
-    #         "played": "1",
-    #         "points": "3",
-    #         "ties": "0",
-    #         "wins": "1"
-    #     },
-    #log.debug(json.dumps(standings, indent=4, sort_keys=True, default=str))
-
-    sortedStandings = []
-    firstCount = 0
-    secondCount = firstConf['size']
-    while True:
-        if compareTeams(standings[firstCount], standings[secondCount]):
-            standings[firstCount]['ranking'] = firstConf['name'] + str(firstCount + 1)
-            sortedStandings.append(standings[firstCount])
-            firstCount += 1
-        else:
-            standings[secondCount]['ranking'] = secondConf['name'] + str(secondCount - firstConf['size'] + 1)
-            sortedStandings.append(standings[secondCount])
-            secondCount += 1
-
-        if firstCount == firstConf['size']:
-            while True:
-                standings[secondCount]['ranking'] = secondConf['name'] + str(secondCount - firstConf['size'] + 1)
-                sortedStandings.append(standings[secondCount])
-                secondCount += 1
-
-                if secondCount == firstConf['size'] + secondConf['size']:
-                    break
-
-            break
-
-        if secondCount == firstConf['size'] + secondConf['size']:
-            while True:
-                standings[firstCount]['ranking'] = firstConf['name'] + str(firstCount + 1)
-                sortedStandings.append(standings[firstCount])
-                firstCount += 1
-
-                if firstCount == firstConf['size']:
-                    break
-
-            break
-
-    #log.debug(json.dumps(sortedStandings, indent=4, sort_keys=True, default=str))
-    return sortedStandings
-
+    , {'link': '/r/LAFC', 'contains': 'Los Angeles Football Club'}]
 
 def parseSchedule():
     page = requests.get("https://www.soundersfc.com/schedule?year=2019")
@@ -390,15 +174,15 @@ while True:
     strListTable = []
     skip = False
 
-    schedule = []
-    standings = []
-    try:
-        schedule = parseSchedule()
-        standings = parseTable()
-    except Exception as err:
-        log.warning("Exception parsing schedule")
-        log.warning(traceback.format_exc())
-        skip = True
+    # schedule = []
+    # standings = []
+    # try:
+    #     schedule = parseSchedule()
+    #     standings = parseTable()
+    # except Exception as err:
+    #     log.warning("Exception parsing schedule")
+    #     log.warning(traceback.format_exc())
+    #     skip = True
 
     try:
         # teamGames = []
@@ -411,53 +195,56 @@ while True:
         #         if game['datetime'] + datetime.timedelta(hours=2) > datetime.datetime.now() and nextGameIndex == -1:
         #             log.debug("Setting nextGameIndex to {}".format(len(teamGames) - 1))
         #             nextGameIndex = len(teamGames) - 1
-        lastTenMatches = mls.getPreviousMatches(Teams.SEATTLE_SOUNDERS_FC.name, 10)
+        schedule = mls.getSchedule(Teams.SEATTLE_SOUNDERS_FC)
+        recentMatches = schedule.getPreviousMatches(10)
 
         strListGames.append("##Recent Match Results\n\n")
         strListGames.append("Date|||Opponent|Result\n")
         strListGames.append(":---:|:---:|---|:---|:---:|:---:\n")
 
-        for match in lastTenMatches:
+        for match in recentMatches:
             strListGames.append(match.details.date.strftime("%m/%d"))
             strListGames.append("|[](")
-            strListGames.append(getCompLink(game['comp']))
+            strListGames.append("/MLS") #TODO
             strListGames.append(")|")
             if match.home_team == Teams.SEATTLE_SOUNDERS_FC.name:
                 strListGames.append("H")
                 strListGames.append("|")
-                strListGames.append(game['away'])
+                strListGames.append(match.away_team.name)
             else:
                 strListGames.append("A")
                 strListGames.append("|")
-                strListGames.append(game['home'])
+                strListGames.append(match.home_team.name)
             strListGames.append("|[")
             strListGames.append(match.details.result)
             strListGames.append("]")
             strListGames.append("\n")
 
+        upcomingMatches = schedule.getUpcomingMatches(6)
+
         strListGames.append("##Upcoming Matches\n\n")
         strListGames.append("Date|||Opponent|PDT|Watch\n")
         strListGames.append(":---:|:---:|---|---|---|:---\n")
-        for game in teamGames[nextGameIndex:nextGameIndex + 6]:
-            strListGames.append(game['datetime'].strftime("%m/%d"))
+        for match in upcomingMatches:
+            strListGames.append(match.details.date.strftime("%m/%d"))
             strListGames.append("|")
             strListGames.append("[](")
-            strListGames.append(getCompLink(game['comp']))
+            strListGames.append("/MLS") #TODO
             strListGames.append(")|")
-            if game['home'] == TEAM_NAME:
+            if match.home_team == Teams.SEATTLE_SOUNDERS_FC.name:
                 strListGames.append("H|")
-                strListGames.append(game['away'])
+                strListGames.append(match.away_team.name)
             else:
                 strListGames.append("A|")
-                strListGames.append(game['home'])
+                strListGames.append(match.home_team.name)
             strListGames.append("|")
-            if game['status'] == 'tbd':
-                strListGames.append("TBD")
-            else:
-                strListGames.append(game['datetime'].strftime("%I:%M %p"))
-            strListGames.append("|")
-            strListGames.append(game['tv'])
-            strListGames.append("\n")
+            # if game['status'] == 'tbd':
+            #     strListGames.append("TBD")
+            # else:
+            #     strListGames.append(game['datetime'].strftime("%I:%M %p"))
+            # strListGames.append("|")
+            # strListGames.append(game['tv'])
+            # strListGames.append("\n")
 
         strListGames.append("\n\n")
 
@@ -467,27 +254,26 @@ while True:
         log.warning(traceback.format_exc())
         skip = True
 
+    #buildWesternConferenceStandingsTable()
     try:
-        strListTable.append("##2018 Western Conference Standings\n\n")
+        strListTable.append("##2019 Western Conference Standings\n\n")
         strListTable.append("Club|Pts|GP|W|L|D|GD\n")
         strListTable.append(":---|:---:|:---:|:---:|:---:|:---:|:---:\n")
 
-        for team in standings:
-            if team['conf'] != 'W':
-                continue
-            strListTable.append(getTeamLink(team['name']))
+        for team in mls.getWesternConferenceStandings():
+            strListTable.append(team.name)
             strListTable.append(" | ")
-            strListTable.append(team['points'])
+            strListTable.append(team.details.points)
             strListTable.append(" | ")
-            strListTable.append(team['played'])
+            strListTable.append(team.details.games_played)
             strListTable.append(" | ")
-            strListTable.append(team['wins'])
+            strListTable.append(team.details.wins)
             strListTable.append(" | ")
-            strListTable.append(team['losses'])
+            strListTable.append(team.details.losses)
             strListTable.append(" | ")
-            strListTable.append(team['ties'])
+            strListTable.append(team.details.ties)
             strListTable.append(" | ")
-            strListTable.append(team['goalDiff'])
+            strListTable.append(team.details.goal_difference)
             strListTable.append(" |\n")
 
         strListTable.append("\n\n\n")
@@ -501,11 +287,12 @@ while True:
             subreddit = r.subreddit(SUBREDDIT)
             description = subreddit.description
             begin = description[0:description.find("##Recent Match Results")]
-            mid = description[description.find("##S2 Matches"):description.find("##2018 Western Conference Standings")]
-            end = description[description.find("##2018 Top Goal Scorers "):]
+            mid = description[description.find("##Tacoma Defiance Matches"):description.find("##2019 Western Conference Standings")]
+            end = description[description.find("##2019 Top Goal Scorers "):]
 
             if debug:
-                log.info(begin + ''.join(strListGames) + mid + ''.join(strListTable) + end)
+                log.info("{0}{1}{2}{3}{4}".format(begin, ''.join(strListGames), mid, ''.join(strListTable), end))
+                #log.info(begin + ''.join(strListGames) + mid + ''.join(strListTable) + end)
             else:
                 try:
                     subreddit.mod.update(description=begin + ''.join(strListGames) + mid + ''.join(strListTable) + end)
